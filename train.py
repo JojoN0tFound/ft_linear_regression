@@ -22,6 +22,7 @@ def uptade_weights(t0, t1):
 		print(f"We update the 'weights.json file with t0 = {weights['t0']} and t1 = {weights['t1']}")
 	return
 
+# class for read and treat the dataset before train
 class Dataset():
 	def __init__(self, data = None, path = None):
 		self.data = data
