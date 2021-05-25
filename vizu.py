@@ -1,7 +1,8 @@
-import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-class Graph():
-	def __init__(self):
-		self = self
+plt.figure(1)
+plt.plot([1,2,3,4,5])
+plt.ylabel("blablabla")
+plt.show()
+plt.pause(100)

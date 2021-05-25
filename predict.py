@@ -8,6 +8,9 @@ def parsing(av, ac):
 	if ac > 2 or ac < 2:
 		return
 	elif ac == 2:
+		if av[1] == "-h" or av[1] == "--help":
+			print("Classic run: no arguments\n\nOptions:\n-r: reset the 'weights.json' file with theta0 = 0 and theta1 = 0")
+			exit()
 		if av[1] == "-r":
 			if os.path.exists('weights.json'):
 				f = open('weights.json', 'w')
@@ -16,9 +19,6 @@ def parsing(av, ac):
 				print("'weights.json' was succesfully reseting with theta0 = 0 and theta1 = 0\n")
 			else :
 				print("'weights.json' file is actually missing so we can't reseting him\n")
-		if av[1] == "-h" or av[1] == "--help":
-			print("Classic run: no arguments\n\nOptions:\n-r: reset the 'weights.json' file with theta0 = 0 and theta1 = 0")
-			exit()
 		return
 
 # simple fct for print error msg
@@ -83,9 +83,9 @@ def predict_km(km, weights):
 
 def predict():
 	parsing(sys.argv, len(sys.argv))
-	weights = get_weights()
 	km = get_km()
 	ask_for_train()
+	weights = get_weights()
 	predict = predict_km(km, weights)
 	print(f"\nThe estimate car price with {km} milleage is: {predict}")
 
