@@ -1,29 +1,15 @@
+#!env/bin/python3
 import json
 import sys
 import os
-import pandas as pd
-import matplotlib.pyplot as plt
+import time
 import numpy as np
-
-vizu = False
-ngd = False
-
-def ft_draw_graph(data, thetas):
-	kilometers = data.data.stdz_kms
-	prices = data.data.stdz_prices
-	x = np.linspace(min(kilometers), max(kilometers), 100)
-	y = thetas[1] * x + thetas[0]
-	plt.plot(x, y, "-r")
-	plt.plot(kilometers, prices, "bo")
-	plt.xlabel("kilometers normalized")
-	plt.ylabel("prices normalized")
-	plt.title("Linear regression graph")
-	plt.show()
+import vizu as vz
 
 def parsing(av, ac):
-	if ac > 2 or ac < 2:
-		return
-	elif ac == 2:
+	vizu = False
+	ngd = False
+	if ac == 2:
 		if av[1] == "-h" or av[1] == "--help":
 			print("Classic run: no arguments\n\nOptions:\n-v: active the visualisator (not working)\n-ngd: use variance and covariance instead of a descent gradient")
 			exit()
@@ -31,14 +17,15 @@ def parsing(av, ac):
 			vizu = True
 		if av[1] == "-ngd":
 			ngd = True
-		return
+	return([vizu, ngd])
 
 # 
-def uptade_weights(t):
+def uptade_weights(t, cost):
 	weights = {"t0": t[0], "t1": t[1]}
 	if os.path.exists('weights.json'):
 		f = open('weights.json', 'w')
 		json.dump(weights, f)
+		print(f"We got a cost of: {cost}")
 		print(f"We update the 'weights.json file with t0 = {weights['t0']} and t1 = {weights['t1']}")
 	return
 
@@ -66,25 +53,19 @@ class Dataset():
 		self.data = data
 		if path != None:
 			self.get_csv(path)
-		self.kms = self.data["km"]
-		self.prices = self.data["price"]
+		self.kms = self.data[:,0]
+		self.prices = self.data[:,1]
 		self.get_mean_std()
 		self.get_variance_covar()
-		self.standartize_data()
-		self.stdz_kms = self.data["stdz_kms"]
-		self.stdz_prices = self.data["stdz_prices"]
-		# self.data["std_kms"] = self.std_kms
-		# self.data["std_prices"] = self.std_prices
+		self.normalize_data()
 
 	# get the csv data
 	def get_csv(self, path):
-		try :
-			self.data = pd.read_csv(path)
-			self.data["km"] = pd.to_numeric(self.data["km"], downcast='float')
-			self.data["price"] = pd.to_numeric(self.data["price"], downcast='float')
-		except Exception as e:
-			print(e)
-			exit()
+		try:
+			self.data = np.loadtxt(path, delimiter = ',', skiprows = 1)
+		except:
+			print ("data.csv file missing")
+			sys.exit()
 
 	# get the variance and the covariance of the dataset
 	def get_variance_covar(self):
@@ -94,30 +75,36 @@ class Dataset():
 		for i in range(len(self.kms)):
 			self.covar += (self.kms[i] - self.mean_kms) * (self.prices[i] - self.mean_prices)
 
-	# get the mean and the standart deviation of the dataset
+	# get the mean of the dataset
 	def get_mean_std(self):
-		self.mean_kms = self.data.mean()["km"]
-		self.mean_prices = self.data.mean()["price"]
-		self.std_kms = self.data.std()["km"]
-		self.std_prices = self.data.std()["price"]
+		self.mean_kms = self.kms.mean()
+		self.mean_prices = self.prices.mean()
 
-	# standardize data using z-score: (value - mean) / standart deviation
-	def standartize_data(self):
-		stdz_kms, stdz_prices = [], []
-		stdz_kms = (self.data["km"] - min(self.data["km"])) / (max(self.data["km"]) - min(self.data["km"]))
-		stdz_prices = (self.data["price"] - min(self.data["price"])) / (max(self.data["price"]) - min(self.data["price"]))
-		self.data["stdz_kms"] = stdz_kms
-		self.data["stdz_prices"] = stdz_prices
+	# normalize data
+	def normalize_data(self):
+		nrmlz_kms, nrmlz_prices = [], []
+		nrmlz_kms = (self.data[:,0] - min(self.data[:,0])) / (max(self.data[:,0]) - min(self.data[:,0]))
+		nrmlz_prices = (self.data[:,1] - min(self.data[:,1])) / (max(self.data[:,1]) - min(self.data[:,1]))
+		self.nrmlz_kms = nrmlz_kms
+		self.nrmlz_prices = nrmlz_prices
 
 class Rocky():
-	def __init__(self, data, learningRate = 1, precision = 0.01035):
+	def __init__(self, data, learningRate = 0.1, learningRateGoal = 0.0000001):
 		self.data = data
+		self.m = len(self.data.kms)
+		self.x = self.data.nrmlz_kms
+		self.y = self.data.nrmlz_prices
 		self.thetas = [0.0, 0.0]
-		self.tmp = [0.0, 0.0]
+		self.thetas_hist = [[0.0, 0.0]]
+		self.dt = [0.0, 0.0]
+		self.dt_hist = [[0.0, 0.0]]
 		self.final_thetas = [0.0, 0.0]
-		self.cost = 0
+		self.cost = 1
+		self.cost_hist = [1]
 		self.learningRate = learningRate
-		self.precision = precision
+		self.learningRateGoal = learningRateGoal
+		self.min_cost_diff = 0.0000001
+		self.iteration = 0
 		
 	def predict_price(self, t, km):
 		return(t[0] + (t[1] * km))
@@ -127,53 +114,51 @@ class Rocky():
 		self.final_thetas[1] = self.data.covar / self.data.variance_kms
 		self.final_thetas[0] = self.data.mean_prices - self.final_thetas[1] * self.data.mean_kms
 
+	# fct for get thetas and the derivate
+	def update_thetas(self, pred):
+		self.dt[0] = (1 / self.m) * sum(pred - self.y)
+		self.dt[1] = (1 / self.m) * sum((pred - self.y) * self.x)
+
+		self.thetas[0] -= self.learningRate * self.dt[0]
+		self.thetas[1] -= self.learningRate * self.dt[1]
+
+		self.thetas_hist.append(self.thetas.copy())
+		self.dt_hist.append(self.dt.copy())
+
+	def get_new_cost(self, pred):
+		self.cost = (1 / (2 * self.m)) * sum((pred - self.y) ** 2)
+		self.cost_hist.append(self.cost.copy())
+
 	def gradient(self):
-		m = len(self.data.kms)
-		x = self.data.stdz_kms
-		y = self.data.stdz_prices
-		i = 0
-		for i in range(m):
-			curr_pred = self.predict_price(self.thetas, x[i])
-			self.tmp[0] = self.tmp[0] + curr_pred - y[i]
-			self.tmp[1] = self.tmp[1] + (curr_pred - y[i]) * x[i]
-		self.thetas[0] = self.learningRate * (1/m) * self.tmp[0]
-		self.thetas[1] = self.learningRate * (1/m) * self.tmp[1]
-		# self.thetas.append([0.0, 0.0])
-		# while True:
-		# 	# print(curr_pred)
-		# 	tmp = 0
-		# 	for j in range(m):
-		# 		tmp = tmp + pow(curr_pred[j] - y[j], 2)
-		# 	self.cost = (1 / (2 * m)) * tmp
-		# 	print(self.cost)
-		# 	if abs(self.cost) <= self.precision:
-		# 		break
-		# 	for j in range(m):
-		# 		self.tmp[0] = self.tmp[0] + x[j] * (curr_pred[j] - y[j])
-		# 		self.tmp[1] = self.tmp[1] + (curr_pred[j] - y[j]) * x[j]
-		# 	new_thetas = [self.thetas[i][0] - (self.learningRate * (1 / m) * self.tmp[0]), self.thetas[i][0] - (self.learningRate * (1 / m) * self.tmp[1])]
-		# 	self.thetas.append(new_thetas)
-		# 	i = i + 1
-		# print(self.thetas)
+		while self.learningRate > self.learningRateGoal:
+			self.iteration += 1
+			curr_pred = self.predict_price(self.thetas, self.x)
+			self.get_new_cost(curr_pred)
+			self.update_thetas(curr_pred)
+			if abs(self.cost > self.cost_hist[-2]) > self.min_cost_diff:
+				break
+			if self.cost > self.cost_hist[-2]:
+				print(f"down ->{self.iteration}")
+				self.cost = self.cost_hist[-2]
+				self.thetas = self.thetas_hist[-2]
+				self.learningRate /= 10
+
 		self.final_thetas = self.thetas
 
-	# def error(self):
-
-
-def train():
-	parsing(sys.argv, len(sys.argv))
+def main():
+	args = parsing(sys.argv, len(sys.argv))
 	data = Dataset(path = 'data.csv')
 	# precision = enter_precision()
 	# learning_rate = enter_learning_rate()
 	# rocky = Rocky(data, learning_rate, precision)
 	rocky = Rocky(data)
-	if ngd == True:
+	if args[1] == True:
 		rocky.get_coef()
 	else:
 		rocky.gradient()
-	uptade_weights(rocky.final_thetas)
-	if vizu == True:
-		ft_draw_graph(data, rocky.final_thetas)
+	uptade_weights(rocky.final_thetas, rocky.cost)
+	if args[0] == True:
+		vz.main(data, rocky)
 
 if __name__ == "__main__":
-	train()
+	main()

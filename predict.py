@@ -1,10 +1,14 @@
+#!env/bin/python3
 import json
 import sys
 import os
 import train
+import numpy as np
 
 # check for arguments: '-r' for reseting the thetas
 def parsing(av, ac):
+	cmp = False
+	ngd = False
 	if ac > 2 or ac < 2:
 		return
 	elif ac == 2:
@@ -17,9 +21,40 @@ def parsing(av, ac):
 				reset = {"t0" : 0, "t1" : 0}
 				json.dump(reset, f)
 				print("'weights.json' was succesfully reseting with theta0 = 0 and theta1 = 0\n")
+				exit()
 			else :
 				print("'weights.json' file is actually missing so we can't reseting him\n")
-		return
+				exit()
+		if av[1] == "-ngd":
+			ngd = True
+		if av[1] == "-cmp":
+			cmp = True
+		return ([cmp, ngd])
+
+# get data.csv
+def get_csv(path):
+	try:
+		csv = np.loadtxt(path, delimiter = ',', skiprows = 1)
+	except:
+		print ("data.csv file missing")
+		sys.exit()
+	return [csv[:, 0], csv[:, 1]]
+
+def normalize(data):
+	return (data - min(data)) / (max(data) - min(data))
+
+def unnormalize(pred, data):
+	return (pred * (max(data) - min(data)) + min(data))
+
+def normalize_data(km, csv):
+	data = [[],[]]
+	if km:
+		data[0].append(km)
+	for elem in csv[0]:
+		data[0].append(elem)
+	data[0] = normalize(data[0])
+	data[1] = csv[1]
+	return data
 
 # simple fct for print error msg
 def error(msg):
@@ -74,19 +109,37 @@ def ask_for_train():
 	while not check_train(yesno):
 		yesno = input()
 	if yesno == "Y":
-		train.train()
+		train.main()
 
 # only the calcul for estimate the car price
 def predict_km(km, weights):
 	price = weights['t0'] + km * weights['t1']
 	return price
 
+def just_compare(args):
+	weights = get_weights()
+	csv = get_csv('data.csv')
+	km = None
+	data = normalize_data(km, csv)
+	for i in range(len(csv[0])):
+		predict = unnormalize(predict_km(data[0][i], weights), data[1])
+		print(f"{csv[0][i]} \n--------->   {csv[1][i]}   |   {predict}")
+	exit()
+
 def predict():
-	parsing(sys.argv, len(sys.argv))
+	args = parsing(sys.argv, len(sys.argv))
+	if args[0]:
+		just_compare(args)
 	km = get_km()
 	ask_for_train()
 	weights = get_weights()
-	predict = predict_km(km, weights)
+	if args[1] == False:
+		csv = get_csv('data.csv')
+		data = normalize_data(km, csv)
+		predict = predict_km(data[0][0], weights)
+		predict = unnormalize(predict, data[1])
+	else:
+		predict = predict_km(km, weights)
 	print(f"\nThe estimate car price with {km} milleage is: {predict}")
 
 if __name__ == "__main__":
