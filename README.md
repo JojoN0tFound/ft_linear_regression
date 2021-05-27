@@ -4,6 +4,8 @@
 ```
 ./train.py   [-h] [-v] [-ngd]
 ./predict.py [-h] [-r] [-cmp]
+```
+
 ##dependencie:
 ```
 pip3 -> (sudo) apt install python3-pip
