@@ -4,32 +4,34 @@ import sys
 import os
 import train
 import numpy as np
+import matplotlib.pyplot as plt
 
-# check for arguments: '-r' for reseting the thetas
+# only for get the input arguments
 def parsing(av, ac):
 	cmp = False
-	ngd = False
-	if ac > 2 or ac < 2:
-		return
-	elif ac == 2:
-		if av[1] == "-h" or av[1] == "--help":
-			print("Classic run: no arguments\n\nOptions:\n-r: reset the 'weights.json' file with theta0 = 0 and theta1 = 0")
-			exit()
-		if av[1] == "-r":
-			if os.path.exists('weights.json'):
-				f = open('weights.json', 'w')
-				reset = {"t0" : 0, "t1" : 0}
-				json.dump(reset, f)
-				print("'weights.json' was succesfully reseting with theta0 = 0 and theta1 = 0\n")
+	if ac < 2:
+		return (cmp)
+	else:
+		for i in range(1, ac):
+			if av[i] == "-h" or av[i] == "--help":
+				print("Classic run: no arguments\n\nOptions:\n-r:   reset the 'weights.json' file with theta0 = 0 and theta1 = 0\n-cmp: compare the csv's prices with our predict pricess with the csv milleage\n")
 				exit()
-			else :
-				print("'weights.json' file is actually missing so we can't reseting him\n")
+			elif av[i] == "-r":
+				if os.path.exists('weights.json'):
+					f = open('weights.json', 'w')
+					reset = {"t0" : 0, "t1" : 0, "ngd" : False}
+					json.dump(reset, f)
+					print("'weights.json' was succesfully reseting with theta0 = 0, theta1 = 0 and ngd = false\n")
+					exit()
+				else :
+					print("'weights.json' file is actually missing so we can't reseting him\n")
+					exit()
+			elif av[i] == "-cmp":
+				cmp = True
+			else:
+				print("Invalid argument please check usage with the flag [-h] or [--help]")
 				exit()
-		if av[1] == "-ngd":
-			ngd = True
-		if av[1] == "-cmp":
-			cmp = True
-		return ([cmp, ngd])
+		return (cmp)
 
 # get data.csv
 def get_csv(path):
@@ -40,12 +42,15 @@ def get_csv(path):
 		sys.exit()
 	return [csv[:, 0], csv[:, 1]]
 
+# fct for normalize a list
 def normalize(data):
 	return (data - min(data)) / (max(data) - min(data))
 
+# fct for get the unnormalized price
 def unnormalize(pred, data):
 	return (pred * (max(data) - min(data)) + min(data))
 
+# store and normalize data for predict the price
 def normalize_data(km, csv):
 	data = [[],[]]
 	if km:
@@ -86,15 +91,20 @@ def get_km():
 
 # fct for get t0 and t1 in the 'weights.json' file, if not: use t0 = 0 and t1 = 0 by default
 def get_weights():
-	weights = {"t0" : 0, "t1" : 0}
+	wrong_weights = {"t0" : 0, "t1" : 0, "ngd" : False}
+	print(f"{'ngd' in wrong_weights}")
 	if os.path.exists('weights.json'):
 		f = open('weights.json')
 		weights = json.load(f)
-		print(f"Go for it with theta0 = {weights['t0']} and theta1 = {weights['t1']}")
-	else :
-		print(f"'weights.json' file is actually missing so we areusing theta0 = {weights['t0']} and theta1 = {weights['t1']} by default")
-	return weights
+		if not 'ngd' in weights:
+			print(f"'weights.json' file is actually wrong so we are using theta0 = {wrong_weights['t0']}, theta1 = {wrong_weights['t1']} and ngd = {wrong_weights['ngd']} by default")
+			return wrong_weights
+		print(f"Go for it with theta0 = {weights['t0']}, theta1 = {weights['t1']} and ngd = {weights['ngd']}")
+		return weights
+	print(f"'weights.json' file is actually missing so we are using theta0 = {wrong_weights['t0']}, theta1 = {wrong_weights['t1']} and ngd = {wrong_weights['ngd']} by default")
+	return wrong_weights
 
+# check your response for the trainning
 def check_train(yesno):
 	try:
 		if yesno == "Y" or yesno == "n":
@@ -103,6 +113,7 @@ def check_train(yesno):
 	except:
 		return(error("\nPlease enter 'Y' for yes or 'n' for no"))
 
+# only for ask if you want to train your model right now
 def ask_for_train():
 	print('\nDo you want to train your model right now ? [Y/n]')
 	yesno = input()
@@ -116,24 +127,48 @@ def predict_km(km, weights):
 	price = weights['t0'] + km * weights['t1']
 	return price
 
+# compare our result and the data.csv result
 def just_compare(args):
+	plt.figure(1)
+	plt.title("Linear Regression over dataset")
+	plt.xlabel("Mileage (km)")
+	plt.ylabel("Prices (USD)")
 	weights = get_weights()
 	csv = get_csv('data.csv')
 	km = None
-	data = normalize_data(km, csv)
+	pred_prices = []
+	if weights['ngd'] == False:
+		data = normalize_data(km, csv)
+	else:
+		data = [[],[]]
+		data[0] = csv[0]
+		data[1] = csv[1]
 	for i in range(len(csv[0])):
-		predict = unnormalize(predict_km(data[0][i], weights), data[1])
+		if weights['ngd'] == False:
+			predict = unnormalize(predict_km(data[0][i], weights), data[1])
+		else:
+			predict = predict_km(data[0][i], weights)
+		pred_prices.append(predict)
 		print(f"{csv[0][i]} \n--------->   {csv[1][i]}   |   {predict}")
+	kms = list(csv[0])
+	prices = list(csv[1])
+	plt.scatter(kms, prices, color = "pink", label="original dataset values")
+	plt.scatter(kms, pred_prices, color = "blue", label="predicted dataset values")
+	plt.legend()
+	plt.pause(0.001)
+	plt.waitforbuttonpress()
+	plt.close()
 	exit()
 
+# a main with a different name
 def predict():
 	args = parsing(sys.argv, len(sys.argv))
-	if args[0]:
+	if args:
 		just_compare(args)
 	km = get_km()
 	ask_for_train()
 	weights = get_weights()
-	if args[1] == False:
+	if weights['ngd'] == False:
 		csv = get_csv('data.csv')
 		data = normalize_data(km, csv)
 		predict = predict_km(data[0][0], weights)
