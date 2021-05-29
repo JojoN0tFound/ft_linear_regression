@@ -64,8 +64,7 @@ class Dataset():
 		self.variance_kms = sum([(x - self.mean_kms)**2 for x in self.kms])
 		self.variance_prices = sum([(x - self.mean_prices)**2 for x in self.prices])
 		self.covar = 0.0
-		for i in range(len(self.kms)):
-			self.covar += (self.kms[i] - self.mean_kms) * (self.prices[i] - self.mean_prices)
+		self.covar = sum((self.kms - self.mean_kms) * (self.prices - self.mean_prices))
 
 	# get the mean of the dataset
 	def get_mean_std(self):
