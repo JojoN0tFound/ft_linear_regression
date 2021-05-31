@@ -57,7 +57,7 @@ def normalize_data(km, csv):
 		data[0].append(km)
 	for elem in csv[0]:
 		data[0].append(elem)
-	data[0] = normalize(data[0])
+	data[0] = normalize(np.array(data[0]))
 	data[1] = csv[1]
 	return data
 
@@ -66,10 +66,16 @@ def error(msg):
 	print(msg)
 	return False
 
+# close ui for -cmp
+def on_close(event):
+	plt.figure(1)
+	plt.close()
+	exit()
+
 # fct for check if the user enter a correct milleage
 def check_input(km):
-	km = float(km)
 	try:
+		km = float(km)
 		if km == 0:
 			return(error('\nNice new car, don\'t need to estimate the price.'))
 		if km < 0:
@@ -92,11 +98,10 @@ def get_km():
 # fct for get t0 and t1 in the 'weights.json' file, if not: use t0 = 0 and t1 = 0 by default
 def get_weights():
 	wrong_weights = {"t0" : 0, "t1" : 0, "ngd" : False}
-	print(f"{'ngd' in wrong_weights}")
 	if os.path.exists('weights.json'):
 		f = open('weights.json')
 		weights = json.load(f)
-		if not 'ngd' in weights:
+		if not {"t0", "t1", "ngd"} <= weights.keys():
 			print(f"'weights.json' file is actually wrong so we are using theta0 = {wrong_weights['t0']}, theta1 = {wrong_weights['t1']} and ngd = {wrong_weights['ngd']} by default")
 			return wrong_weights
 		print(f"Go for it with theta0 = {weights['t0']}, theta1 = {weights['t1']} and ngd = {weights['ngd']}")
@@ -120,6 +125,7 @@ def ask_for_train():
 	while not check_train(yesno):
 		yesno = input()
 	if yesno == "Y":
+		print("Start training")
 		train.main()
 
 # only the calcul for estimate the car price
@@ -129,7 +135,7 @@ def predict_km(km, weights):
 
 # compare our result and the data.csv result
 def just_compare(args):
-	plt.figure(1)
+	fig = plt.figure(1)
 	plt.title("Linear Regression over dataset")
 	plt.xlabel("Mileage (km)")
 	plt.ylabel("Prices (USD)")
@@ -156,6 +162,7 @@ def just_compare(args):
 	plt.scatter(kms, pred_prices, color = "blue", label="predicted dataset values")
 	plt.legend()
 	plt.pause(0.001)
+	fig.canvas.mpl_connect('close_event', on_close)
 	plt.waitforbuttonpress()
 	plt.close()
 	exit()
