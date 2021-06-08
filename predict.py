@@ -19,7 +19,7 @@ def parsing(av, ac):
 			elif av[i] == "-r":
 				if os.path.exists('weights.json'):
 					f = open('weights.json', 'w')
-					reset = {"t0" : 0, "t1" : 0, "ngd" : False}
+					reset = {"t0" : 0.0, "t1" : 0.0, "ngd" : False}
 					json.dump(reset, f)
 					print("'weights.json' was succesfully reseting with theta0 = 0, theta1 = 0 and ngd = false\n")
 					exit()
@@ -97,7 +97,7 @@ def get_km():
 
 # fct for get t0 and t1 in the 'weights.json' file, if not: use t0 = 0 and t1 = 0 by default
 def get_weights():
-	wrong_weights = {"t0" : 0, "t1" : 0, "ngd" : False}
+	wrong_weights = {"t0" : 0.0, "t1" : 0.0, "ngd" : False}
 	if os.path.exists('weights.json'):
 		f = open('weights.json')
 		weights = json.load(f)
@@ -175,7 +175,7 @@ def predict():
 	km = get_km()
 	ask_for_train()
 	weights = get_weights()
-	if weights['ngd'] == False:
+	if weights['ngd'] == False and weights['t0'] != 0.0 and weights['ngd'] != 0.0:
 		csv = get_csv('data.csv')
 		data = normalize_data(km, csv)
 		predict = predict_km(data[0][0], weights)
