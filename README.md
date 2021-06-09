@@ -7,6 +7,9 @@
 ```
 
 ## Dependencie:
+
+We suppose you already install python3
+
 ### Linux
 ```
 pip3 -> (sudo) apt install python3-pip
@@ -16,7 +19,6 @@ venv -> (sudo) apt-get install python3-venv
 
 ### Macos
 ```
-python3 -> brew install python3
 pip3    -> python3 -m pip install pip
 venv    -> sudo pip3 install virtualenv
 ```
