@@ -175,7 +175,7 @@ def predict():
 	km = get_km()
 	ask_for_train()
 	weights = get_weights()
-	if weights['ngd'] == False and weights['t0'] != 0.0 and weights['ngd'] != 0.0:
+	if weights['ngd'] == False or (weights['t0'] != 0.0 and weights['ngd'] != 0.0):
 		csv = get_csv('data.csv')
 		data = normalize_data(km, csv)
 		predict = predict_km(data[0][0], weights)
